@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api.js";
 
-const emptyData = { doctors: [], followups: [], products: [], sales: [] };
+const emptyData = { doctors: [], visits: [], followups: [], products: [], sales: [] };
 const initialProducts = [
   { id: 1, name: "Product One", composition: "Replace with approved composition", category: "Category to confirm", price: 0, stock: 0, active: true },
   { id: 2, name: "Product Two", composition: "Replace with approved composition", category: "Category to confirm", price: 0, stock: 0, active: true },
@@ -12,8 +12,9 @@ const initialProducts = [
 ];
 const sections = [
   { id: "overview", label: "Overview", icon: "▦" },
-  { id: "doctors", label: "Doctor directory", icon: "♙" },
-  { id: "followups", label: "Follow-ups", icon: "◷" },
+  { id: "doctors", label: "Doctors", icon: "♙" },
+  { id: "visits", label: "Doctor visits", icon: "✓" },
+  { id: "followups", label: "Reminders", icon: "◷" },
   { id: "products", label: "Products", icon: "▤" },
   { id: "sales", label: "Sales tracker", icon: "↗" },
 ];
@@ -59,7 +60,8 @@ function Login({ onLogin, onBack, busy, error }) {
 function RecordForm({ section, onSave, onCancel, data }) {
   const configs = {
     doctors: { title: "Add doctor", fields: [["name", "Doctor name", "text", true], ["specialty", "Specialty", "text"], ["clinic", "Clinic / hospital", "text"], ["city", "City", "text"], ["phone", "Phone", "tel"], ["lastVisit", "Last visit", "date"], ["nextFollow", "Next follow-up", "date"], ["notes", "Notes", "textarea"]] },
-    followups: { title: "Schedule follow-up", fields: [["doctor", "Doctor name", "text", true], ["date", "Follow-up date", "date", true], ["type", "Purpose", "text", true], ["status", "Status (Due / Scheduled / Overdue / Complete)", "text", true], ["notes", "Notes", "textarea"]] },
+    visits: { title: "Log doctor visit", fields: [["doctor", "Doctor name", "text", true], ["date", "Visit date", "date", true], ["purpose", "Visit purpose", "text", true], ["productsDiscussed", "Products discussed", "text"], ["outcome", "Visit outcome / next step", "text"], ["notes", "Visit notes", "textarea"]] },
+    followups: { title: "Add reminder", fields: [["doctor", "Doctor name", "text", true], ["date", "Reminder date", "date", true], ["type", "Reminder / purpose", "text", true], ["status", "Status (Scheduled / Overdue / Complete)", "text", true], ["notes", "Notes", "textarea"]] },
     products: { title: "Add product", fields: [["name", "Product name", "text", true], ["composition", "Composition / strength", "text"], ["category", "Category", "text"], ["price", "Price (₹)", "number"], ["stock", "Stock / units", "number"]] },
     sales: { title: "Record sale", fields: [["date", "Sale date", "date", true], ["product", "Product name", "text", true], ["units", "Units", "number", true], ["amount", "Amount (₹)", "number", true], ["source", "Customer / source", "text"]] },
   };
@@ -71,7 +73,7 @@ function RecordForm({ section, onSave, onCancel, data }) {
     const record = { ...values, id: nextId(data[section]) };
     if (section === "products") { record.price = Number(record.price) || 0; record.stock = Number(record.stock) || 0; record.active = true; }
     if (section === "sales") { record.units = Number(record.units) || 0; record.amount = Number(record.amount) || 0; const match = data.products.find((p) => p.name.toLowerCase() === record.product.toLowerCase()); if (match) record.productId = match.id; }
-    if (section === "followups") { const match = data.doctors.find((d) => d.name.toLowerCase() === record.doctor.toLowerCase()); if (match) record.doctorId = match.id; }
+    if (section === "followups" || section === "visits") { const match = data.doctors.find((d) => d.name.toLowerCase() === record.doctor.toLowerCase()); if (match) record.doctorId = match.id; }
     onSave(record);
   };
   return <div className="modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}><form className="record-modal" onSubmit={submit}><div className="modal-heading"><div><span className="eyebrow">BUSINESS DESK</span><h2>{config.title}</h2></div><button type="button" className="icon-button" onClick={onCancel} aria-label="Close">×</button></div>{config.fields.map(([key, label, type, required]) => <label key={key}>{label}{type === "textarea" ? <textarea rows="3" required={required} value={values[key]} onChange={(e) => setValues({ ...values, [key]: e.target.value })} /> : <input type={type} required={required} min={type === "number" ? 0 : undefined} value={values[key]} onChange={(e) => setValues({ ...values, [key]: e.target.value })} />}</label>)}<div className="modal-actions"><button type="button" className="button button-outline" onClick={onCancel}>Cancel</button><button className="button button-primary">Save record</button></div></form></div>;
@@ -90,7 +92,9 @@ function Dashboard({ user, data, onChangeData, onLogout, saving, savedAt, error,
   const totalSales = data.sales.reduce((sum, sale) => sum + (Number(sale.amount) || 0), 0);
   const updateSection = useCallback((section, rows) => onChangeData({ ...data, [section]: rows }), [data, onChangeData]);
   const saveRecord = (record) => {
-    updateSection(modal, [...data[modal], record]);
+    const nextData = { ...data, [modal]: [...(data[modal] || []), record] };
+    if (modal === "visits" && record.doctorId) nextData.doctors = data.doctors.map((doctor) => doctor.id === record.doctorId ? { ...doctor, lastVisit: record.date } : doctor);
+    onChangeData(nextData);
     setModal("");
     setNotice("Record saved.");
     window.setTimeout(() => setNotice(""), 2500);
@@ -99,7 +103,8 @@ function Dashboard({ user, data, onChangeData, onLogout, saving, savedAt, error,
   const exportCsv = () => {
     const rows = [["record_type", "id", "date", "name", "detail", "status", "amount", "units"]];
     data.doctors.forEach((d) => rows.push(["doctor", d.id, d.lastVisit, d.name, [d.specialty, d.clinic, d.city].filter(Boolean).join(" | "), d.status || "", "", ""]));
-    data.followups.forEach((f) => rows.push(["follow-up", f.id, f.date, f.doctor, [f.type, f.notes].filter(Boolean).join(" | "), f.status || "", "", ""]));
+    data.visits.forEach((v) => rows.push(["doctor-visit", v.id, v.date, v.doctor, [v.purpose, v.productsDiscussed, v.outcome, v.notes].filter(Boolean).join(" | "), "covered", "", ""]));
+    data.followups.forEach((f) => rows.push(["reminder", f.id, f.date, f.doctor, [f.type, f.notes].filter(Boolean).join(" | "), f.status || "", "", ""]));
     data.products.forEach((p) => rows.push(["product", p.id, "", p.name, [p.composition, p.category].filter(Boolean).join(" | "), p.active ? "active" : "inactive", p.price || 0, p.stock || 0]));
     data.sales.forEach((s) => rows.push(["sale", s.id, s.date, s.product, s.source || "", "", s.amount || 0, s.units || 0]));
     const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n");
@@ -110,20 +115,21 @@ function Dashboard({ user, data, onChangeData, onLogout, saving, savedAt, error,
   const currentRows = active === "doctors" ? filteredDoctors : data[active] || [];
   const columnsBySection = {
     doctors: [["Doctor", "name"], ["Specialty", "specialty"], ["Clinic", "clinic"], ["City", "city"], ["Last visit", "lastVisit"], ["Next follow-up", "nextFollow"]],
-    followups: [["Doctor", "doctor"], ["Date", "date"], ["Purpose", "type"], ["Status", "status"]],
+    visits: [["Doctor", "doctor"], ["Visit date", "date"], ["Purpose", "purpose"], ["Products discussed", "productsDiscussed"], ["Outcome / next step", "outcome"]],
+    followups: [["Doctor", "doctor"], ["Reminder date", "date"], ["Reminder", "type"], ["Status", "status"]],
     products: [["Product", "name"], ["Composition", "composition"], ["Category", "category"], ["Price", "price"], ["Stock", "stock"]],
     sales: [["Date", "date"], ["Product", "product"], ["Units", "units"], ["Amount", "amount"], ["Source", "source"]],
   };
   return <div className={`dashboard ${mobileNav ? "mobile-nav-open" : ""}`}>
     <aside className="sidebar"><Brand subtitle="BUSINESS DESK" /><span className="sidebar-label">WORKSPACE</span>{sections.map((section) => <button key={section.id} className={active === section.id ? "sidebar-link active" : "sidebar-link"} onClick={() => { setActive(section.id); setMobileNav(false); setQuery(""); }}><span>{section.icon}</span>{section.label}{section.id === "doctors" && <b>{data.doctors.length}</b>}{section.id === "followups" && overdue.length > 0 && <b className="alert-count">{overdue.length}</b>}</button>)}<div className="sidebar-bottom"><div className="avatar">{(user.email || "RF").slice(0, 2).toUpperCase()}</div><div><b>{user.email}</b><small>Authenticated workspace</small></div><button className="logout-mini" onClick={onLogout} aria-label="Sign out">↗</button></div></aside>
     <div className="dashboard-main"><header className="dashboard-top"><div className="top-left"><button className="menu-toggle dashboard-menu" onClick={() => setMobileNav(!mobileNav)} aria-label="Toggle dashboard navigation">☰</button><span>Workspace <b>/</b> <strong>{sectionLabel}</strong></span></div><div className="top-actions"><span className={saving ? "save-status saving" : "save-status"}>{saving ? "Saving…" : savedAt ? "Saved to database" : "Connected"}</span><button className="button button-outline export-button" onClick={exportCsv}>Export CSV ↓</button><button className="button button-primary" onClick={() => setModal(active === "overview" ? "doctors" : active)}>＋ Add record</button><button className="button button-outline logout-button" onClick={onLogout}>Sign out</button></div></header>
-      <main className="dashboard-content"><div className="dashboard-heading"><div><span className="eyebrow">RANSAR WORKSPACE</span><h1>{active === "overview" ? "Your business at a glance." : sectionLabel}</h1><p>{active === "overview" ? "Keep your next conversations moving." : `Manage your ${sectionLabel.toLowerCase()} in one place.`}</p></div><span className="date-chip">{new Date().toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }).toUpperCase()}</span></div>
+      <main className="dashboard-content"><div className="dashboard-heading"><div><span className="eyebrow">RANSAR WORKSPACE</span><h1>{active === "overview" ? "Your territory at a glance." : sectionLabel}</h1><p>{active === "overview" ? "Track doctor coverage, visits and reminders in one place." : `Manage your ${sectionLabel.toLowerCase()} in one place.`}</p></div><span className="date-chip">{new Date().toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }).toUpperCase()}</span></div>
       {error && <div className="error-banner" role="alert">{error}<button onClick={onRetry}>Retry</button></div>}
       {notice && <div className="success-banner" role="status">{notice}</div>}
       {active === "overview" ? <>
-        <div className="metric-grid"><article className="metric-card"><span>Doctors</span><b>{data.doctors.length}</b><small>In your directory</small></article><article className="metric-card"><span>Follow-ups due</span><b>{dueSoon.length}</b><small>{overdue.length} overdue</small></article><article className="metric-card"><span>Active products</span><b>{data.products.filter((p) => p.active !== false).length}</b><small>In your catalogue</small></article><article className="metric-card"><span>Recorded sales</span><b>{money(totalSales)}</b><small>{data.sales.length} entries recorded</small></article></div>
-        <div className="dashboard-panels"><section className="panel"><div className="panel-title"><div><h2>Upcoming follow-ups</h2><p>Due today and overdue items</p></div><button className="text-button" onClick={() => setActive("followups")}>View all →</button></div>{data.followups.filter((f) => f.status !== "Complete").slice().sort((a,b) => String(a.date).localeCompare(String(b.date))).slice(0,6).map((item) => <div className="followup-row" key={item.id}><div className="row-avatar">{(item.doctor || "?").split(" ").slice(0,2).map((x) => x[0]).join("")}</div><div><b>{item.doctor}</b><span>{item.type || "Follow-up"}</span></div><time>{niceDate(item.date)}</time></div>)}{!data.followups.some((f) => f.status !== "Complete") && <div className="empty-state"><b>No follow-ups yet</b><span>Add a follow-up to see it here.</span></div>}</section><section className="panel"><div className="panel-title"><div><h2>Quick actions</h2><p>Keep records up to date</p></div></div>{[["doctors","Add a doctor","Create a healthcare professional record"],["followups","Schedule follow-up","Plan the next conversation"],["products","Add a product","Update your portfolio"],["sales","Record a sale","Track product sales"]].map(([id,label,desc]) => <button className="quick-action" key={id} onClick={() => setModal(id)}><span>＋</span><div><b>{label}</b><small>{desc}</small></div><strong>→</strong></button>)}</section></div>
-      </> : <section className="panel records-panel"><div className="panel-title"><div><h2>{sectionLabel}</h2><p>{currentRows.length} record{currentRows.length === 1 ? "" : "s"}</p></div><div className="record-tools">{active === "doctors" && <input className="search-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search doctors…" aria-label="Search doctors" />}<button className="button button-primary" onClick={() => setModal(active)}>＋ Add {active === "followups" ? "follow-up" : active === "doctors" ? "doctor" : active === "products" ? "product" : "sale"}</button></div></div>{renderTable(currentRows, [...(columnsBySection[active] || []), ...(active === "followups" ? [["Action", "action"]] : [])], `Use the add button to create your first ${active === "followups" ? "follow-up" : active === "doctors" ? "doctor record" : active === "products" ? "product" : "sale"}.`)}</section>}
+        <div className="metric-grid"><article className="metric-card"><span>Doctors in territory</span><b>{data.doctors.length}</b><small>In your directory</small></article><article className="metric-card"><span>Reminders due</span><b>{dueSoon.length}</b><small>{overdue.length} overdue</small></article><article className="metric-card"><span>Doctors covered</span><b>{new Set(data.visits.filter((v) => v.date && v.date.slice(0, 7) === dateToday().slice(0, 7)).map((v) => v.doctorId || (v.doctor || "").toLowerCase())).size}</b><small>This month</small></article><article className="metric-card"><span>Visits logged</span><b>{data.visits.length}</b><small>All recorded visits</small></article></div>
+        <div className="dashboard-panels"><section className="panel"><div className="panel-title"><div><h2>Upcoming reminders</h2><p>Due today and overdue items</p></div><button className="text-button" onClick={() => setActive("followups")}>View all →</button></div>{data.followups.filter((f) => f.status !== "Complete").slice().sort((a,b) => String(a.date).localeCompare(String(b.date))).slice(0,6).map((item) => <div className="followup-row" key={item.id}><div className="row-avatar">{(item.doctor || "?").split(" ").slice(0,2).map((x) => x[0]).join("")}</div><div><b>{item.doctor}</b><span>{item.type || "Follow-up"}</span></div><time>{niceDate(item.date)}</time></div>)}{!data.followups.some((f) => f.status !== "Complete") && <div className="empty-state"><b>No follow-ups yet</b><span>Add a follow-up to see it here.</span></div>}</section><section className="panel"><div className="panel-title"><div><h2>Quick actions</h2><p>Keep records up to date</p></div></div>{[["doctors","Add a doctor","Create a healthcare professional record"],["visits","Log doctor visit","Record a doctor covered and visit outcome"],["followups","Add reminder","Plan the next conversation"],["products","Add a product","Update your portfolio"],["sales","Record a sale","Track product sales"]].map(([id,label,desc]) => <button className="quick-action" key={id} onClick={() => setModal(id)}><span>＋</span><div><b>{label}</b><small>{desc}</small></div><strong>→</strong></button>)}</section></div>
+      </> : <section className="panel records-panel"><div className="panel-title"><div><h2>{sectionLabel}</h2><p>{currentRows.length} record{currentRows.length === 1 ? "" : "s"}</p></div><div className="record-tools">{active === "doctors" && <input className="search-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search doctors…" aria-label="Search doctors" />}<button className="button button-primary" onClick={() => setModal(active)}>＋ Add {active === "followups" ? "reminder" : active === "visits" ? "visit" : active === "doctors" ? "doctor" : active === "products" ? "product" : "sale"}</button></div></div>{renderTable(currentRows, [...(columnsBySection[active] || []), ...(active === "followups" ? [["Action", "action"]] : [])], `Use the add button to create your first ${active === "followups" ? "follow-up" : active === "doctors" ? "doctor record" : active === "products" ? "product" : "sale"}.`)}</section>}
       <footer className="dashboard-footer"><span>Ransar Business Desk</span><span>Changes are saved to the connected PostgreSQL database.</span></footer>
       </main>
     </div>{mobileNav && <button className="mobile-scrim" onClick={() => setMobileNav(false)} aria-label="Close navigation" />}{modal && <RecordForm section={modal} data={data} onSave={saveRecord} onCancel={() => setModal("")} />}
