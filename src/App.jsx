@@ -66,7 +66,7 @@ function RecordForm({ section, onSave, onCancel, data }) {
     sales: { title: "Record sale", fields: [["date", "Sale date", "date", true], ["product", "Product name", "text", true], ["units", "Units", "number", true], ["amount", "Amount (₹)", "number", true], ["source", "Customer / source", "text"]] },
   };
   const config = configs[section];
-  const [values, setValues] = useState(() => section === "doctors" ? { lastVisit: dateToday(), ...Object.fromEntries(config.fields.map(([key]) => [key, ""])) } : section === "followups" ? { date: dateToday(), status: "Scheduled", ...Object.fromEntries(config.fields.map(([key]) => [key, ""])) } : section === "products" ? { price: "0", stock: "0", ...Object.fromEntries(config.fields.map(([key]) => [key, ""])) } : { date: dateToday(), units: "1", amount: "0", ...Object.fromEntries(config.fields.map(([key]) => [key, ""])) });
+  const [values, setValues] = useState(() => ({ ...Object.fromEntries(config.fields.map(([key]) => [key, ""])), ...(section === "doctors" ? { lastVisit: dateToday() } : {}), ...(section === "visits" ? { date: dateToday() } : {}), ...(section === "followups" ? { date: dateToday(), status: "Scheduled" } : {}), ...(section === "products" ? { price: "0", stock: "0" } : {}), ...(section === "sales" ? { date: dateToday(), units: "1", amount: "0" } : {}) }));
   if (!config) return null;
   const submit = (event) => {
     event.preventDefault();
