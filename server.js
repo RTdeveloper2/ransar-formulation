@@ -82,8 +82,8 @@ app.put("/api/data", requireAuth, async (req, res) => {
     return res.json({ ok: true, savedAt: new Date().toISOString() });
   } catch (error) { console.error("Data save failed:", error.message); return res.status(500).json({ error: "Unable to save changes. Check your connection and try again." }); }
 });
-app.use(express.static(path.join(__dirname), { index: "index.html", extensions: ["html"] }));
-app.get("*", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
+app.use(express.static(path.join(__dirname, "dist"), { index: "index.html", fallthrough: true }));
+app.get("*", (_req, res) => res.sendFile(path.join(__dirname, "dist", "index.html")));
 initDatabase().then(() => app.listen(PORT, () => console.log("Ransar Formulation server listening on port " + PORT))).catch(error => {
   console.error("Database initialization failed:", error);
   process.exit(1);
