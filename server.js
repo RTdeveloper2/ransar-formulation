@@ -26,9 +26,13 @@ const EMPTY_DATA = { doctors: [], followups: [], products: [], sales: [] };
 
 async function initDatabase() {
   await pool.query(
-    "CREATE TABLE IF NOT EXISTS app_users (id BIGSERIAL PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());" +
-    "CREATE TABLE IF NOT EXISTS business_data (id INTEGER PRIMARY KEY CHECK (id = 1), data JSONB NOT NULL DEFAULT '{\"doctors\":[],\"followups\":[],\"products\":[],\"sales\":[]}'::jsonb, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());" +
-    "INSERT INTO business_data (id, data) VALUES (1, $1::jsonb) ON CONFLICT (id) DO NOTHING;",
+    "CREATE TABLE IF NOT EXISTS app_users (id BIGSERIAL PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"
+  );
+  await pool.query(
+    "CREATE TABLE IF NOT EXISTS business_data (id INTEGER PRIMARY KEY CHECK (id = 1), data JSONB NOT NULL DEFAULT '{\"doctors\":[],\"followups\":[],\"products\":[],\"sales\":[]}'::jsonb, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"
+  );
+  await pool.query(
+    "INSERT INTO business_data (id, data) VALUES (1, $1::jsonb) ON CONFLICT (id) DO NOTHING",
     [JSON.stringify(EMPTY_DATA)]
   );
   const email = String(process.env.ADMIN_EMAIL || "").trim().toLowerCase();
