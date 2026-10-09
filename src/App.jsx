@@ -143,7 +143,7 @@ export default function App() {
   const [busyLogin, setBusyLogin] = useState(false);
   const [revision, setRevision] = useState(0);
 
-  const signOut = useCallback(() => { sessionStorage.removeItem("ransar_token"); sessionStorage.removeItem("ransar_user"); setToken(""); setUser(null); setData(emptyData); setPage("login"); setDataError(""); }, []);
+  const signOut = useCallback(() => { sessionStorage.removeItem("ransar_token"); sessionStorage.removeItem("ransar_user"); setToken(""); setUser(null); setData(emptyData); setRevision(0); setPage("login"); setDataError(""); }, []);
   const loadData = useCallback(async (activeToken) => {
     setLoading(true); setDataError("");
     try { const result = await api.getData(activeToken); setData({ ...emptyData, ...result.data }); setSavedAt(result.updatedAt || ""); }
@@ -165,7 +165,7 @@ export default function App() {
 
   const login = async (email, password) => {
     setBusyLogin(true); setAuthError("");
-    try { const result = await api.login(email, password); sessionStorage.setItem("ransar_token", result.token); sessionStorage.setItem("ransar_user", JSON.stringify(result.user)); setToken(result.token); setUser(result.user); setData(emptyData); setPage("dashboard"); }
+    try { const result = await api.login(email, password); sessionStorage.setItem("ransar_token", result.token); sessionStorage.setItem("ransar_user", JSON.stringify(result.user)); setToken(result.token); setUser(result.user); setData(emptyData); setRevision(0); setPage("dashboard"); }
     catch (error) { setAuthError(error.message); }
     finally { setBusyLogin(false); }
   };
