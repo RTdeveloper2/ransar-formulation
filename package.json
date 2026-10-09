@@ -1,12 +1,15 @@
 {
   "name": "ransar-formulation",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Ransar Formulation website and authenticated PostgreSQL business desk",
-  "main": "server.js",
+  "description": "Ransar Formulation React frontend, Node.js API and PostgreSQL business desk",
+  "type": "module",
   "scripts": {
+    "dev": "vite",
+    "dev:api": "node --watch server.js",
+    "build": "vite build",
     "start": "node server.js",
-    "check": "node --check server.js && node --check app.js"
+    "check": "node --check server.js && vite build"
   },
   "engines": {
     "node": ">=20"
@@ -18,6 +21,12 @@
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.7"
   }
 }
