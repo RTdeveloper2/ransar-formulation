@@ -22,14 +22,14 @@ app.disable("x-powered-by");
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(express.json({ limit: "1mb" }));
 app.use("/api/login", rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: "draft-7", legacyHeaders: false }));
-const EMPTY_DATA = { doctors: [], followups: [], products: [], sales: [] };
+const EMPTY_DATA = { doctors: [], visits: [], followups: [], products: [], sales: [] };
 
 async function initDatabase() {
   await pool.query(
     "CREATE TABLE IF NOT EXISTS app_users (id BIGSERIAL PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"
   );
   await pool.query(
-    "CREATE TABLE IF NOT EXISTS business_data (id INTEGER PRIMARY KEY CHECK (id = 1), data JSONB NOT NULL DEFAULT '{\"doctors\":[],\"followups\":[],\"products\":[],\"sales\":[]}'::jsonb, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"
+    "CREATE TABLE IF NOT EXISTS business_data (id INTEGER PRIMARY KEY CHECK (id = 1), data JSONB NOT NULL DEFAULT '{\"doctors\":[],\"visits\":[],\"followups\":[],\"products\":[],\"sales\":[]}'::jsonb, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"
   );
   await pool.query(
     "INSERT INTO business_data (id, data) VALUES (1, $1::jsonb) ON CONFLICT (id) DO NOTHING",
@@ -77,7 +77,7 @@ app.get("/api/data", requireAuth, async (_req, res) => {
 });
 app.put("/api/data", requireAuth, async (req, res) => {
   const data = req.body?.data;
-  const keys = ["doctors", "followups", "products", "sales"];
+  const keys = ["doctors", "visits", "followups", "products", "sales"];
   if (!data || typeof data !== "object" || keys.some(key => !Array.isArray(data[key])) || keys.some(key => data[key].length > 10000)) {
     return res.status(400).json({ error: "Business data has an invalid format or is too large." });
   }
