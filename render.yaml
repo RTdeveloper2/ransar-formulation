@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: ransar-formulation
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: .
